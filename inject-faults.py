@@ -2,8 +2,8 @@
 import sys
 from optparse import OptionParser
 
-from binpy.objdump import Objdump
-from binpy.edit import BinaryEditor
+from binject.objdump import Objdump
+from binject.edit import BinaryEditor
 
 
 if __name__ == '__main__':

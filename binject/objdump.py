@@ -11,6 +11,7 @@ class Objdump(object):
         # -d disassemble
         # -S include source
         # -F include section file offset
+        # -x print all headers
         self._flags = "-dSF"
 
     def _exec(self, path):
