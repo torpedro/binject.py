@@ -64,5 +64,5 @@ target/
 
 
 # c++
-
-cpp-example/example
+test
+test_*
