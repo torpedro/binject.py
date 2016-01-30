@@ -4,9 +4,7 @@ from optparse import OptionParser
 
 from binject.inject import Injector
 
-
 if __name__ == '__main__':
-
     parser = OptionParser()
     parser.add_option("-p", "--pid", dest="pid")
     parser.add_option("-b", "--binary", dest="binary")

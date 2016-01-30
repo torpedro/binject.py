@@ -34,11 +34,7 @@ class BinaryEditor(AbstractByteEditor):
         self._fh = open(self._path, "rb")
 
         self._content = list(self._fh.read())
-
-        # for byte in self._content:
-        #   uint, = struct.unpack("<B", byte)
-        #   byte = self._fh.read(1)
-
+        
         self._fh.close()
 
     def write(self, path):
