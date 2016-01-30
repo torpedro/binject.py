@@ -3,14 +3,34 @@ import struct
 import os
 import stat
 
-class BinaryEditor(object):
+class AbstractByteEditor(object):
+    """docstring for AbstractByteEditor"""
+    def __init__(self):
+        super(AbstractByteEditor, self).__init__()
+
+    def open(self):
+        raise Exception("Should be implemented by subclass")
+
+    def close(self):
+        raise Exception("Should be implemented by subclass")
+
+    def setByteInt(self, address, intvalue):
+        raise Exception("Should be implemented by subclass")
+
+    def setByteHex(self, address, hexvalue):
+        raise Exception("Should be implemented by subclass")
+
+
+
+
+class BinaryEditor(AbstractByteEditor):
     """docstring for BinaryEditor"""
     def __init__(self, path):
         super(BinaryEditor, self).__init__()
         self._path = path
 
 
-    def read(self):
+    def open(self):
         self._fh = open(self._path, "rb")
 
         self._content = list(self._fh.read())
@@ -26,6 +46,9 @@ class BinaryEditor(object):
             fh.write(''.join(self._content))
         
         os.chmod(path, stat.S_IRWXU)
+
+    def close(self):
+        pass
 
     def setByteInt(self, address, value):
         self._content[address] = struct.pack("<B", value)
