@@ -70,4 +70,5 @@ if __name__ == '__main__':
 
 
     editor.write("cpp-example/injected")
+    # editor.write(binaryPath)
     
