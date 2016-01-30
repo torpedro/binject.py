@@ -1,0 +1,9 @@
+
+
+NOP = 0x90 # 1 byte
+HLT = 0xF4 # 1 byte
+INT = 0xCD # 1 byte
+INT3 = 0xCC # 1 byte
+CLI = 0xFA
+STI = 0xFB
+

@@ -45,7 +45,7 @@ class BinaryEditor(AbstractByteEditor):
         with open(path, "wb") as fh:
             fh.write(''.join(self._content))
         
-        os.chmod(path, stat.S_IRWXU)
+        os.chmod(path, stat.S_IRWXU | stat.S_IROTH | stat.S_IXOTH)
 
     def close(self):
         pass

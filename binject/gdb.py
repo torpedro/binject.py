@@ -47,7 +47,7 @@ class GDBWrapper(AbstractByteEditor):
 
         # wait for prompt
         while self._lines[-1].startswith("(gdb)") is False:
-            sleep(0.1)
+            sleep(0.05)
 
     def quit(self):
         self.writeToStdin("quit\n")
@@ -57,17 +57,17 @@ class GDBWrapper(AbstractByteEditor):
     def getByte(self, address):
         self.writeToStdin("x/ubfx %s" % (address))
         # self.writeToStdin("p *(char*)%s" % (address))
-        sleep(0.2)
+        sleep(0.05)
         res = self._lines[-2]
-        print "[Result] ", res
+        # print "[Result] ", res
         # TODO handle
 
     def setByteInt(self, address, intvalue):
         self.writeToStdin("set (*(char*)%s) = %d" % (address, intvalue))
 
-        sleep(0.2)
+        sleep(0.05)
         res = self._lines[-2]
-        print res
+        # print res
 
     def setByteHex(self, address, hexvalue):
         return self.setByteInt(address, int(hexvalue, 16))
