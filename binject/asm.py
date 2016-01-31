@@ -46,6 +46,9 @@ class Instruction(object):
 
     def __init__(self):
         super(Instruction, self).__init__()
+
+    def __str__(self):
+        return "%s: %s\t%s\t%s" % (self.hexaddr, ' '.join(self.bytes), self.opcode, self.params)
         
     @staticmethod
     def parseObjdumpString(line, section, symbol):
