@@ -1,92 +1,172 @@
 
 import os
 import sys
+import re
 
-from binject.objdump import Objdump
-from binject.edit import BinaryEditor
-from binject.gdb import GDBWrapper
-from binject.x86 import *
+from utils import userHasRoot
+from objdump import Objdump
+from edit import BinaryEditor
+from gdb import GDBWrapper
+from x86 import *
+
 
 class Injector(object):
     """docstring for Injector"""
-    def __init__(self, binaryPath, pid):
+    def __init__(self):
         super(Injector, self).__init__()
-        self._binaryPath = binaryPath
-        self._pid = pid
 
+        self.editMode = None # process|binary
 
-    def hasRootPrivileges(self):
-        return os.geteuid() == 0
+    #
+    # Objdump
+    #
 
+    def analyze(self, binaryPath, objdumpBin="objdump"):
+        self.info("Analyzing the binary... (%s)" % (binaryPath))
 
-    def analyze(self, objdumpBin="objdump"):
-        path = self._binaryPath
+        self.objdump = Objdump(objdumpBin)
+        self.objdump.analyze(binaryPath)
 
-        print "Analyzing the binary... (%s)" % (path)
-        self._objdump = Objdump(objdumpBin)
-        self._objdump.analyze(path)
+    def loadAnalysis(self, pathToDump):
+        self.objdump = Objdump()
+        self.objdump.loadFromFile(pathToDump)
 
+    def saveAnalysis(self, pathToDump):
+        self.objdump.cacheStdout(pathToDump)
 
-    def injectLineSkip(self, editor, line):
-        print "Skipping instructions of line... (%s)" % (line["text"])
-        objdump = self._objdump
-        instructions = objdump.getInstructionsOfRange(line["instruction_first"], line["instruction_last"])
+    #
+    # Editor
+    #
 
-        for i, inst in enumerate(instructions):
-            addr = inst.addr
-            if self._isFileEditor:
-                addr = objdump.getFileAddressOfInstruction(inst)
+    def setEditMode(self, mode, target=None):
+        self.editMode = mode
+        if target:
+            self.target = target
 
-            if inst.opcode != "lea":
-                print " * %s: %s\t%s\t%s" % (inst.hexaddr, ' '.join(inst.bytes), inst.opcode, inst.params)
-                for j, byte in enumerate(inst.bytes):
-                    editor.setByteInt(addr + j, NOP)
-        
+    def setTarget(self, target):
+        self.target = target
 
-    def injectLineFault(self, editor, line):
-        print "Injecting faults in instructions of line... (%s)" % (line["text"])
-        objdump = self._objdump
-        instructions = objdump.getInstructionsOfRange(line["instruction_first"], line["instruction_last"])
+    def openEditor(self):
+        if self.editMode == "process":
+            if not userHasRoot():
+                self.error("Need to be root")
+                return None
 
-        for i, inst in enumerate(instructions):
-            addr = inst.addr
-            if self._isFileEditor:
-                addr = objdump.getFileAddressOfInstruction(inst)
-
-            print " * %s: %s\t%s\t%s" % (inst.hexaddr, ' '.join(inst.bytes), inst.opcode, inst.params)
-            for j, byte in enumerate(inst.bytes):
-                editor.setByteInt(addr + j, HLT)
-
-
-    def inject(self, outputPath=None):
-        objdump = self._objdump
-        editor = None
-
-            
-        if self._pid:
-            editor = GDBWrapper(self._pid)
+            self.editor = GDBWrapper(self.target)
             self._isFileEditor = False
-            if not self.hasRootPrivileges():
-                print "Error: Need root permissions."
-                sys.exit(-1)
-        else:
-            editor = BinaryEditor(self._binaryPath)
+        elif self.editMode == "binary":
+            self.editor = BinaryEditor(self.target)
             self._isFileEditor = True
+        else:
+            self.error("Edit mode not set correctly!")
+            return None
 
-        print "Opening the editor..."
-        editor.open()
+        self.editor.open()
+        return self.editor
 
-        for line in objdump.getSourceLines():
+    def closeEditor(self):
+        self.editor.close()
+
+    def writeBinary(self, path):
+        self.editor.write(path)
+
+
+    #
+    # Injection
+    #
+
+    def injectSkipAtLine(self, line):
+        self.info("Skipping instructions of line... (%s)" % (line["text"]))
+
+        instructions = self.objdump.getInstructionsOfRange(line["instruction_first"], line["instruction_last"])
+
+        for i, inst in enumerate(instructions):
+            if inst.opcode != "lea":
+                self.injectSkipAtInstruction(inst)
+        
+    def injectSkipAtInstruction(self, inst):
+        "replaces all bytes in the instruction with NOP"
+
+        addr = inst.addr
+        if self._isFileEditor:
+            addr = self.objdump.getFileAddressOfInstruction(inst)
+
+        self.info(" * %s: %s\t%s\t%s" % (inst.hexaddr, ' '.join(inst.bytes), inst.opcode, inst.params))
+        for j, byte in enumerate(inst.bytes):
+            self.editor.setByteInt(addr + j, NOP)
+
+
+
+    def injectFaultAtLine(self, line):
+        self.info("Injecting faults in instructions of line... (%s)" % (line["text"]))
+
+        instructions = self.objdump.getInstructionsOfRange(line["instruction_first"], line["instruction_last"])
+
+        for i, inst in enumerate(instructions):
+            self.injectFaultAtInstruction(inst)
+
+    def injectFaultAtInstruction(self, inst):
+        "replaces all bytes in the instruction with HLT"
+
+        addr = inst.addr
+        if self._isFileEditor:
+            addr = self.objdump.getFileAddressOfInstruction(inst)
+
+        self.info(" * %s: %s\t%s\t%s" % (inst.hexaddr, ' '.join(inst.bytes), inst.opcode, inst.params))
+        for j, byte in enumerate(inst.bytes):
+            self.editor.setByteInt(addr + j, HLT)
+
+
+    def injectSourceHooks(self):
+        for line in self.objdump.getSourceLines():
             # skip injection: replaces the instructions with nops
             if "<inject-skip>" in line["text"]:
-                self.injectLineSkip(editor, line)
+                self.injectSkipAtLine(line)
 
             # inject faults into every instruction of line
             if "<inject-fault>" in line["text"]:
-                self.injectLineFault(editor, line)
+                self.injectFaultAtLine(line)
+
+    def info(self, string):
+        print "[INFO] %s" % (string)
+
+    def error(self, string):
+        print "[ERROR] %s" % (string)
 
 
-        if self._isFileEditor and outputPath:
-            editor.write(outputPath)
+    def getLinesWithHooks(self):
+        lines = []
 
-        editor.close()
+        for line in self.objdump.getSourceLines():
+            if "<inject" in line["text"]: # TODO: replace with regex
+                lines.append(line)
+
+        return lines
+
+
+
+
+
+
+
+
+
+
+
+
+if __name__ == '__main__':
+    inj = Injector()
+
+
+    inj.analyze("../cpp-example/example")
+    inj.openEditor()
+
+    inj.setEditMode("binary")
+    inj.setTarget("../cpp-example/example")
+    inj.openEditor()
+
+    print inj.getLinesWithHooks()
+
+    inj.closeEditor()
+
+

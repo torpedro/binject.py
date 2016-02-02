@@ -3,49 +3,28 @@
 This tool is used to mark specific lines in C or C++ source code
 at which faults will be injected into the compiled binary.
 
-## Basic Usage
+## Injection Shell
 
-Mark lines at which a fault should be injected.
 
-```
-int main() {
-    printf("Hello\n");
-    printf("World\n"); // <inject-fault>
-    printf("!\n");   
-}
-```
-
-For the injection to work you have to compile your code with the debug flag `-g`.
-
-Run the fault injector tool. This will create a copy of you binary with
-seg-faults injected at the locations of the comment.
+### Inject into a running process
 
 ```
-Usage: python inject-faults.py [OPTIONS] input-binary output-binary
+python shell.py
 
-python inject-faults.py /path/to/binary /path/to/faulty-binary
+(binject) help
+
+analyze binaryPath       # load the memory information for the executable
+setEditMode process      # we want to edit a living process
+setTarget 4242           # process id
+
+showLines                # print the source lines of the application, that have hooks
+
+injectFaultAtLine 17     # inject fault at the line (index is shown in showLines)
+injectSkipAtLine 20      # skip this line
+
+closeEditor
 ```
 
 
-## Options
-
-There are several options to customize how faults are injected.
-
-### Source Code Hooks
-
- * `// <inject-fault>`
-    
-    injects the fault at the first asm instructon of this line
-    
- * `// <inject-fault-last>`
-    
-    injects the fault at the last asm instruction of this line
-    
- * `// <inject-fault-each>`
-    
-    injects the fault at each instruction of this line (makes only sense when using the --each option)
-    
-### Command Line Options
-
-tbd
+### Inject and save into a binary file
 
