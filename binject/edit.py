@@ -20,6 +20,12 @@ class AbstractByteEditor(object):
     def setByteHex(self, address, hexvalue):
         raise Exception("Should be implemented by subclass")
 
+    def isOpen(self):
+        raise Exception("Should be implemented by subclass")
+
+    def isFileEditor(self):
+        return False
+
 
 
 
@@ -29,6 +35,8 @@ class BinaryEditor(AbstractByteEditor):
         super(BinaryEditor, self).__init__()
         self._path = path
 
+    def isFileEditor(self):
+        return True
 
     def open(self):
         self._fh = open(self._path, "rb")

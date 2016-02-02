@@ -16,10 +16,52 @@ class Objdump(object):
         # -x print all headers
         self._flags = "-dSFx"
 
-    def _exec(self, path):
+
+    def loadFromFile(self, path):
+        "Load the stdout that was cached into a file"
+
+        with open(path, "r") as fh:
+            self._stdout = fh.read()
+            self._parseResult(self._stdout)
+
+
+    def analyze(self, path, cacheFile=None):
+        "Run objdump and analyze the stdout"
+
         proc = Popen([self._command, self._flags, path], stdout=PIPE, stderr=PIPE)
         proc.wait()
         self._stdout = proc.stdout.read()
+
+        if cacheFile:
+            self.cacheStdout(cacheFile)
+
+        self._parseResult(self._stdout)
+
+    def cacheStdout(self, cacheFile):
+        with open(cacheFile, "w") as fh:
+            fh.write(self._stdout)
+
+
+
+    def _parseResult(self, stdout):
+        lines = stdout.split("\n")
+        lines = [line.strip() for line in lines]
+
+        self._sections = {}
+        self._symbols = {}
+        self._instructions = {}
+        self._sourceLines = []
+
+        self._curSection = None
+        self._curSymbol = None
+        self._curLine = None
+
+        for line in lines:
+            if len(line.strip()) == 0: continue
+            result = self._parseLine(line)
+
+            if not result and self._curSection:
+                print "[DEBUG] Unmatched: %s" % (line)
 
 
     def _parseLine(self, line):
@@ -65,53 +107,38 @@ class Objdump(object):
             return self._curLine
 
 
-    def analyze(self, path):
-        self._exec(path)        
-
-        lines = self._stdout.split("\n")
-        lines = [line.strip() for line in lines]
-
-        self._sections = {}
-        self._symbols = {}
-        self._instructions = {}
-        self._sourceLines = []
-
-        self._curSection = None
-        self._curSymbol = None
-        self._curLine = None
-
-        for line in lines:
-            if len(line.strip()) == 0: continue
-            result = self._parseLine(line)
-
-            if not result and self._curSection:
-                print "[DEBUG] Unmatched: %s" % (line)
-
-
     def getFunctionByName(self, name):
         for section in self._sections:
             for symbol in section.symbols:
                 if symbol.name == name:
                     return symbol
 
-    """
-        * parameters are integer number (base 10)
-    """
+
     def getInstructionsOfRange(self, addrstart, addrend):
+        "Parameters are integer numbers (base 10)"
+
         instructions = []
         for addr in self._instructions:
             if addrstart <= addr and addr <= addrend:
                 instructions.append(self._instructions[addr])
         return instructions
 
+
     def getSection(self, id):
         return self._sections[id]
+
 
     def getSymbol(self, id):
         return self._symbols[id]
 
+
+    def getInstruction(self, address):
+        return self._instructions[address]
+
+
     def getSourceLines(self):
         return self._sourceLines
+
 
     def getFileAddressOfInstruction(self, instruction):
         symbol = self.getSymbol(instruction.symbol)
@@ -119,3 +146,19 @@ class Objdump(object):
 
         return instruction.addr + offset
 
+
+
+
+
+
+if __name__ == '__main__':
+    binary = "../cpp-example/example"
+
+    dump1 = Objdump()
+    dump1.analyze(binary)
+    print dump1._sections
+    dump1.cacheStdout("cache.objdump")
+
+    dump2 = Objdump()
+    dump2.loadFromFile("cache.objdump")
+    print dump2._sections

@@ -67,3 +67,4 @@ target/
 test
 test_*
 injected
+binject/cache.objdump
