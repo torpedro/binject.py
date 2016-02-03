@@ -6,6 +6,7 @@ from optparse import OptionParser
 from binject.inject import Injector
 from binject.objdump import Objdump
 from binject.gdb import GDBWrapper
+from binject.edit import BinaryEditor
 
 class InjectShell(cmd.Cmd):
     prompt = "(inject) "
@@ -15,6 +16,26 @@ class InjectShell(cmd.Cmd):
 
     def setEditor(self, editor):
         self.editor = editor
+
+    def convert(self, arg, typ):
+        try:
+            if typ == "int":
+                return int(arg)
+            if typ == "hex":
+                return int(arg, 16)
+        except Exception, e:
+            return None
+        return arg
+
+    def parseArg(self, arg, types):
+        args = arg.split(" ")
+        conv = []
+        for j, typ in enumerate(types):
+            if j < len(args):
+                conv.append(self.convert(args[j], typ))
+            else:
+                conv.append(None)
+        return conv
 
     def do_lines(self, arg):
         for j, line in enumerate(self.objdump.getSourceLines()):
@@ -30,16 +51,21 @@ class InjectShell(cmd.Cmd):
         except Exception, e:
             print e
 
+    def do_open(self, arg):
+        self.editor.open()
+
+    def do_close(self, arg):
+        self.editor.close()
+
     def do_set(self, arg):
-        args = arg.split(" ")
-        try:
-            address = int(args[0], 16)
-            byte = int(args[1], 16)
-            self.editor.open()
-            self.editor.setByteInt(address, byte)
-            self.editor.close()
-        except Exception, e:
-            print e
+        [address, byte] = self.parseArg(arg, ["hex", "hex"])
+        if address is not None and byte is not None:
+            if self.editor.isOpen():
+                self.editor.setByteInt(address, byte)
+            else:
+                print "Editor not open!"
+        else:
+            print "Wrong arguments!"
 
     def do_setr(self, arg):
         args = arg.split(" ")
@@ -56,6 +82,11 @@ class InjectShell(cmd.Cmd):
             self.editor.close()
         except Exception, e:
             print e
+
+    def do_get(self, arg):
+        [address] = self.parseArg(arg, ["hex"])
+        
+
 
 
 

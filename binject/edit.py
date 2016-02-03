@@ -27,8 +27,6 @@ class AbstractByteEditor(object):
         return False
 
 
-
-
 class BinaryEditor(AbstractByteEditor):
     """docstring for BinaryEditor"""
     def __init__(self, path):
