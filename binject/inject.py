@@ -8,6 +8,7 @@ from objdump import Objdump
 from edit import BinaryEditor
 from gdb import GDBWrapper
 from x86 import *
+from grep import grep
 
 
 class Injector(object):
@@ -39,6 +40,10 @@ class Injector(object):
     #
 
     def setEditMode(self, mode, target=None):
+        if mode not in ["binary", "process"]:
+            self.error("Invalid edit mode!")
+            return None
+
         self.editMode = mode
         if target:
             self.target = target
@@ -49,7 +54,7 @@ class Injector(object):
     def openEditor(self):
         if self.editMode == "process":
             if not userHasRoot():
-                self.error("Need to be root")
+                self.error("Needs to be root!")
                 return None
 
             self.editor = GDBWrapper(self.target)
@@ -75,8 +80,26 @@ class Injector(object):
     # Injection
     #
 
+    def resetInstruction(self, inst):
+        self.info("Reset: %s: %s\t%s\t%s" % (inst.hexaddr, ' '.join(inst.bytes), inst.opcode, inst.params))
+        
+        addr = inst.addr
+        if self._isFileEditor:
+            addr = self.objdump.getFileAddressOfInstruction(inst)
+
+        for j, byte in enumerate(inst.bytes):
+            self.editor.setByteHex(addr + j, byte)
+
+    def resetInstructionsAtLine(self, line):
+        instructions = self.objdump.getInstructionsOfRange(line["instruction_first"], line["instruction_last"])
+
+        for i, inst in enumerate(instructions):
+            self.resetInstruction(inst)
+
+
+
     def injectSkipAtLine(self, line):
-        self.info("Skipping instructions of line... (%s)" % (line["text"]))
+        self.info("Skipping instructions of line... (%s:%d)" % (line["file"], line["lineno"]))
 
         instructions = self.objdump.getInstructionsOfRange(line["instruction_first"], line["instruction_last"])
 
@@ -98,12 +121,11 @@ class Injector(object):
 
 
     def injectFaultAtLine(self, line):
-        self.info("Injecting faults in instructions of line... (%s)" % (line["text"]))
+        self.info("Injecting faults in instructions of line... (%s:%d)" % (line["file"], line["lineno"]))
 
         instructions = self.objdump.getInstructionsOfRange(line["instruction_first"], line["instruction_last"])
-
-        for i, inst in enumerate(instructions):
-            self.injectFaultAtInstruction(inst)
+        first = instructions[0]
+        self.injectFaultAtInstruction(first)
 
     def injectFaultAtInstruction(self, inst):
         "replaces all bytes in the instruction with HLT"
@@ -117,16 +139,6 @@ class Injector(object):
             self.editor.setByteInt(addr + j, HLT)
 
 
-    def injectSourceHooks(self):
-        for line in self.objdump.getSourceLines():
-            # skip injection: replaces the instructions with nops
-            if "<inject-skip>" in line["text"]:
-                self.injectSkipAtLine(line)
-
-            # inject faults into every instruction of line
-            if "<inject-fault>" in line["text"]:
-                self.injectFaultAtLine(line)
-
     def info(self, string):
         print "[INFO] %s" % (string)
 
@@ -134,39 +146,75 @@ class Injector(object):
         print "[ERROR] %s" % (string)
 
 
-    def getLinesWithHooks(self):
-        lines = []
 
-        for line in self.objdump.getSourceLines():
-            if "<inject" in line["text"]: # TODO: replace with regex
-                lines.append(line)
+class AutoInjector(Injector):
 
-        return lines
+    def __init__(self):
+        super(AutoInjector, self).__init__()
+
+    def setSourcePath(self, path):
+        self._path = path
+
+    def extractHooks(self):
+        matches = grep(self._path, "^.*<(inject-(.*))>.*$")
+
+        hooks = []
+
+        sources = self.objdump.getSources()
+        for path, lineno, match in matches:
+            fname = os.path.basename(path)
+            line = None
+
+            for other in sources:
+                if fname == os.path.basename(other):
+                    line = sources[other][lineno]
+                    break  
+
+            if line:
+                hooks.append((line, match.group(2)))
+            else:
+                print "Couldn't match hook (%s)" % (matches.group(0))
+
+        self._hooks = hooks
+        return hooks
 
 
+    def injectHook(self, hook):
+        line, hookType = hook
 
+        if hookType == "fault":
+            self.injectFaultAtLine(line)
+        elif hookType == "skip":
+            self.injectSkipAtLine(line)
+        else:
+            print "Unknown hook type (%s)" % (hookType)
 
-
-
-
+    def resetHook(self, hook):
+        line, hookType = hook
+        self.resetInstructionsAtLine(line)
 
 
 
 
 
 if __name__ == '__main__':
-    inj = Injector()
 
+    inj = AutoInjector()
 
+    # init
     inj.analyze("../cpp-example/example")
-    inj.openEditor()
-
-    inj.setEditMode("binary")
+    inj.setSourcePath("../cpp-example/")
     inj.setTarget("../cpp-example/example")
+    inj.setEditMode("binary")
+
+    # edit
     inj.openEditor()
 
-    print inj.getLinesWithHooks()
+    hooks = inj.extractHooks()
+    for hook in hooks:
+        inj.injectHook(hook)
 
+    inj.writeBinary("injected")    
     inj.closeEditor()
 
 

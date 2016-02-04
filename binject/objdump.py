@@ -3,6 +3,7 @@ import re
 from subprocess import Popen, PIPE
 from asm import Section, Symbol, Instruction
 
+LINE_RE = re.compile(r"^(.*):([0-9]+)$")
 
 class Objdump(object):
     """docstring for Objdump"""
@@ -12,9 +13,10 @@ class Objdump(object):
 
         # -d disassemble
         # -S include source
+        # -l include file line markers
         # -F include section file offset
         # -x print all headers
-        self._flags = "-dSFx"
+        self._flags = "-dlFx"
 
 
     def loadFromFile(self, path):
@@ -50,7 +52,8 @@ class Objdump(object):
         self._sections = {}
         self._symbols = {}
         self._instructions = {}
-        self._sourceLines = []
+        self._sources = {}
+        self._unmatchedLines = []
 
         self._curSection = None
         self._curSymbol = None
@@ -60,8 +63,8 @@ class Objdump(object):
             if len(line.strip()) == 0: continue
             result = self._parseLine(line)
 
-            if not result and self._curSection:
-                print "[DEBUG] Unmatched: %s" % (line)
+            if not result:
+                self._unmatchedLines.append(line)
 
 
     def _parseLine(self, line):
@@ -98,13 +101,25 @@ class Objdump(object):
                 return instruction
 
             # source code line
-            self._curLine = {
-                "text": line,
-                "instruction_first": None,
-                "instruction_last": None
-            }
-            self._sourceLines.append(self._curLine)
-            return self._curLine
+            match = LINE_RE.match(line)
+            if match:
+                path = match.group(1)
+                lineno = int(match.group(2))
+
+                self._curLine = {
+                    "file": path,
+                    "lineno": lineno,
+                    "instruction_first": None,
+                    "instruction_last": None
+                }
+
+                if not path in self._sources:
+                    self._sources[path] = {}
+                if not lineno in self._sources[path]:
+                    self._sources[path][lineno] = {}
+
+                self._sources[path][lineno] = self._curLine
+                return self._curLine
 
 
     def getFunctionByName(self, name):
@@ -127,25 +142,33 @@ class Objdump(object):
     def getSection(self, id):
         return self._sections[id]
 
-
     def getSymbol(self, id):
         return self._symbols[id]
-
 
     def getInstruction(self, address):
         return self._instructions[address]
 
+    def getSections(self):
+        return self._sections
 
-    def getSourceLines(self):
-        return self._sourceLines
+    def getSymbols(self):
+        return self._symbols
 
+    def getInstructions(self):
+        return self._instructions
+
+    def getSources(self):
+        return self._sources
 
     def getFileAddressOfInstruction(self, instruction):
         symbol = self.getSymbol(instruction.symbol)
         offset = symbol.fileOffset - symbol.startAddr
-
         return instruction.addr + offset
 
+    def getFileOffset(self):
+        if len(self._symbols) > 0:
+            symbol = self._symbols[self._symbols.keys()[0]]
+            return symbol.startAddr - symbol.fileOffset
 
 
 
@@ -156,9 +179,14 @@ if __name__ == '__main__':
 
     dump1 = Objdump()
     dump1.analyze(binary)
-    print dump1._sections
+    print dump1.getSources()
     dump1.cacheStdout("cache.objdump")
 
     dump2 = Objdump()
     dump2.loadFromFile("cache.objdump")
-    print dump2._sections
+    print dump2.getSources()
+
+    print dump2.getFileOffset()
+
+
+

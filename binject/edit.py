@@ -55,6 +55,9 @@ class BinaryEditor(AbstractByteEditor):
     def setByteInt(self, address, value):
         self._content[address] = struct.pack("<B", value)
 
+    def setByteHex(self, address, hex):
+        self.setByteInt(address, int(hex, 16))
+
     def getByteInt(self, address):
         uint, = struct.unpack("<B", self._content[address])
         return uint

@@ -1,6 +1,9 @@
 
 CC = g++
-CFLAGS = -g -Wall
+CFLAGS = -g -gstabs -Wall
 
 example: example.cpp
 	$(CC) $(CFLAGS) example.cpp -o example
+
+
+
