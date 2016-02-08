@@ -146,7 +146,10 @@ class Objdump(object):
         return self._symbols[id]
 
     def getInstruction(self, address):
-        return self._instructions[address]
+        if address in self._instructions:
+            return self._instructions[address]
+        else:
+            return None
 
     def getSections(self):
         return self._sections

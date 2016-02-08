@@ -14,8 +14,8 @@ long sum(int n) {
         result += i; // <inject-skip>
     }
 
-    if (n % 2 == 1) {
-        printf("fault\n"); // <inject-fault>
+    if (n == 5) {
+        printf("fault will be injected here\n"); // <inject-fault>
     }
     return result;
 }

@@ -45,6 +45,7 @@ class GDBWrapper(AbstractByteEditor):
         t = Thread(target=logStdoutThread, args=(p, self))
         t.start()    
 
+        self._isOpen = True
         # wait for prompt
         while self._lines[-1].startswith("(gdb)") is False:
             sleep(0.05)
@@ -78,3 +79,4 @@ class GDBWrapper(AbstractByteEditor):
     def close(self):
         self.quit()
         self.wait()
+        self._isOpen = False

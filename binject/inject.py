@@ -17,6 +17,8 @@ class Injector(object):
         super(Injector, self).__init__()
 
         self.editMode = None # process|binary
+        self.editor = None
+        self.objdump = None
 
     #
     # Objdump
@@ -27,13 +29,16 @@ class Injector(object):
 
         self.objdump = Objdump(objdumpBin)
         self.objdump.analyze(binaryPath)
+        return True
 
     def loadAnalysis(self, pathToDump):
         self.objdump = Objdump()
         self.objdump.loadFromFile(pathToDump)
+        return True
 
     def saveAnalysis(self, pathToDump):
         self.objdump.cacheStdout(pathToDump)
+        return True
 
     #
     # Editor
@@ -42,20 +47,22 @@ class Injector(object):
     def setEditMode(self, mode, target=None):
         if mode not in ["binary", "process"]:
             self.error("Invalid edit mode!")
-            return None
+            return False
 
         self.editMode = mode
         if target:
             self.target = target
+        return True
 
     def setTarget(self, target):
         self.target = target
+        return True
 
     def openEditor(self):
         if self.editMode == "process":
             if not userHasRoot():
                 self.error("Needs to be root!")
-                return None
+                return False
 
             self.editor = GDBWrapper(self.target)
             self._isFileEditor = False
@@ -64,13 +71,15 @@ class Injector(object):
             self._isFileEditor = True
         else:
             self.error("Edit mode not set correctly!")
-            return None
+            return False
 
         self.editor.open()
-        return self.editor
+        return self.editor is not None
 
     def closeEditor(self):
         self.editor.close()
+        self.editor = None
+        return True
 
     def writeBinary(self, path):
         self.editor.write(path)
@@ -79,8 +88,16 @@ class Injector(object):
     #
     # Injection
     #
+    def checkEditor(self):
+        if not self.editor or not self.editor.isOpen():
+            self.error("Editor is not open!")
+            return False
+        return True
+
 
     def resetInstruction(self, inst):
+        if not self.checkEditor(): return False
+
         self.info("Reset: %s: %s\t%s\t%s" % (inst.hexaddr, ' '.join(inst.bytes), inst.opcode, inst.params))
         
         addr = inst.addr
@@ -109,6 +126,7 @@ class Injector(object):
         
     def injectSkipAtInstruction(self, inst):
         "replaces all bytes in the instruction with NOP"
+        if not self.checkEditor(): return False
 
         addr = inst.addr
         if self._isFileEditor:
@@ -129,6 +147,7 @@ class Injector(object):
 
     def injectFaultAtInstruction(self, inst):
         "replaces all bytes in the instruction with HLT"
+        if not self.checkEditor(): return False
 
         addr = inst.addr
         if self._isFileEditor:
@@ -154,6 +173,7 @@ class AutoInjector(Injector):
 
     def setSourcePath(self, path):
         self._path = path
+        return True
 
     def extractHooks(self):
         matches = grep(self._path, "^.*<(inject-(.*))>.*$")
@@ -171,7 +191,7 @@ class AutoInjector(Injector):
                     break  
 
             if line:
-                hooks.append((line, match.group(2)))
+                hooks.append((line, match.group(2), match.group(0)))
             else:
                 print "Couldn't match hook (%s)" % (matches.group(0))
 

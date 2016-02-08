@@ -7,6 +7,7 @@ class AbstractByteEditor(object):
     """docstring for AbstractByteEditor"""
     def __init__(self):
         super(AbstractByteEditor, self).__init__()
+        self._isOpen = False
 
     def open(self):
         raise Exception("Should be implemented by subclass")
@@ -21,7 +22,7 @@ class AbstractByteEditor(object):
         raise Exception("Should be implemented by subclass")
 
     def isOpen(self):
-        raise Exception("Should be implemented by subclass")
+        return self._isOpen
 
     def isFileEditor(self):
         return False
@@ -42,6 +43,8 @@ class BinaryEditor(AbstractByteEditor):
         self._content = list(self._fh.read())
         
         self._fh.close()
+        
+        self._isOpen = True
 
     def write(self, path):
         with open(path, "wb") as fh:

@@ -13,16 +13,16 @@ python shell.py
 
 (binject) help
 
-analyze binaryPath       # load the memory information for the executable
-setEditMode process      # we want to edit a living process
-setTarget 4242           # process id
+(binject) analyze binaryPath       # load the memory information for the executable
+(binject) setEditMode process      # we want to edit a living process
+(binject) setTarget 4242           # process id
 
-showLines                # print the source lines of the application, that have hooks
+(binject) showLines                # print the source lines of the application, that have hooks
 
-injectFaultAtLine 17     # inject fault at the line (index is shown in showLines)
-injectSkipAtLine 20      # skip this line
+(binject) injectFaultAtLine 17     # inject fault at the line (index is shown in showLines)
+(binject) injectSkipAtLine 20      # skip this line
 
-closeEditor
+(binject) closeEditor
 ```
 
 
