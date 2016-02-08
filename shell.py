@@ -7,7 +7,9 @@ from optparse import OptionParser
 from binject.inject import AutoInjector
 
 class InjectShell(cmd.Cmd):
-    prompt = "(binject) "
+    # Color Escape Sequences
+    # http://www.tldp.org/HOWTO/Bash-Prompt-HOWTO/x329.html
+    prompt = "\x1b[1;34m(binject)\x1b[0m " # highlight color
 
     def __init__(self):
         cmd.Cmd.__init__(self)
@@ -100,7 +102,10 @@ class InjectShell(cmd.Cmd):
         return self.injector.setTarget(path)
 
     def do_injectFaultAt(self, arg):
-        "injects a fault at the given instruction or hook"
+        """injects a fault at the given instruction or hook
+        e.g. injectFaultAt hook 1
+        e.g. injectFaultAt inst 4008cf
+        """
         [typ, address] = self.parseArgs(arg, ["str", "hex"])
 
         if typ == "inst":
@@ -118,7 +123,10 @@ class InjectShell(cmd.Cmd):
         return False
 
     def do_injectSkipAt(self, arg):
-        "injects a skip at the given instruction or hook"
+        """injects a skip at the given instruction or hook
+        e.g. injectSkipAt hook 1
+        e.g. injectSkipAt inst 4008cf
+        """
         [typ, address] = self.parseArgs(arg, ["str", "hex"])
 
         if typ == "inst":
@@ -180,12 +188,16 @@ class InjectShell(cmd.Cmd):
             t2 = time.time()
 
             if success:
-                self.stdout.write("done (%.2fms)\n" % (1000*(t2-t1)))
+                # green highlight
+                self.stdout.write("\x1b[1;32mdone\x1b[0m (%.2fms)\n" % (1000*(t2-t1)))
             else:
-                self.stdout.write("failed (%.2fms)\n" % (1000*(t2-t1)))
+                # red highlight
+                self.stdout.write("\x1b[1;31mfailed\x1b[0m (%.2fms)\n" % (1000*(t2-t1)))
             return False
         
-
+    def do_help(self, arg):
+        cmd.Cmd.do_help(self, arg)
+        return True
 
 
 
