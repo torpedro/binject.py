@@ -1,4 +1,4 @@
-# binject (Binary/Assembly Injector)
+# binject.py (Binary/Assembly Injector)
 
 This tool is used to mark specific lines in C or C++ source code
 at which faults will be injected into the compiled binary.
@@ -36,7 +36,7 @@ python shell.py
 (binject) hook 2          # look at the instructions of hook #2
 
 # inject
-(binject) readBinary
+(binject) open
 (binject) injectSkipAt hook 1
 (binject) injectFaultAt hook 2
 (binject) saveBinary cpp-example/injected

@@ -15,6 +15,7 @@ class InjectShell(cmd.Cmd):
         cmd.Cmd.__init__(self)
 
         self.injector = AutoInjector()
+        self.doPrintResult = True
 
     def convert(self, arg, typ):
         try:
@@ -77,7 +78,6 @@ class InjectShell(cmd.Cmd):
             lineObj, typ, lineText = hook
             self.stdout.write("%.2d: %s\n" % (i+1, lineText))
         return True
-
 
     def do_hook(self, arg):
         [hookIndex] = self.parseArgs(arg, ["int"])
@@ -143,11 +143,17 @@ class InjectShell(cmd.Cmd):
 
         return False
 
-    def do_openEditor(self, arg):
+    def do_open(self, arg):
         return self.injector.openEditor()
 
-    def do_closeEditor(self, arg):
+    def do_close(self, arg):
         return self.injector.closeEditor()
+
+    def do_saveBinary(self, arg):
+        [path] = self.parseArgs(arg, ["str"])
+
+        return self.injector.writeBinary(path)
+
 
 
 
@@ -187,27 +193,52 @@ class InjectShell(cmd.Cmd):
                 self.stdout.write("An error occurred: %s\n" % (e))
             t2 = time.time()
 
-            if success:
-                # green highlight
-                self.stdout.write("\x1b[1;32mdone\x1b[0m (%.2fms)\n" % (1000*(t2-t1)))
-            else:
-                # red highlight
-                self.stdout.write("\x1b[1;31mfailed\x1b[0m (%.2fms)\n" % (1000*(t2-t1)))
+            if self.doPrintResult:
+                if success:
+                    # green highlight
+                    self.stdout.write("\x1b[1;32mdone\x1b[0m (%.2fms)\n" % (1000*(t2-t1)))
+                else:
+                    # red highlight
+                    self.stdout.write("\x1b[1;31mfailed\x1b[0m (%.2fms)\n" % (1000*(t2-t1)))
+
             return False
         
+    def completenames(self, text, *ignored):
+        dotext = 'do_'+text
+        options = [a[3:] for a in self.get_names() if a.startswith(dotext)]
+        return options
+
+    def get_names(self):
+        # This method used to pull in base class attributes
+        # at a time dir() didn't do it yet.
+        return dir(self.__class__)
+
     def do_help(self, arg):
         cmd.Cmd.do_help(self, arg)
         return True
 
 
 
+
+
 if __name__ == '__main__':
     parser = OptionParser()
+    parser.add_option("-f", type="string", dest="file")
     (options, args) = parser.parse_args()
 
     shell = InjectShell()
 
-    for arg in args:
-        shell.onecmd(arg)
+    if options.file:
+        with open(options.file, "r") as fh:
+            cmds = fh.readlines()
+            for cmd in [cmd.strip() for cmd in cmds]:
+                if len(cmd) > 0:
+                    print "%s%s" % (shell.prompt, cmd)
+                    shell.onecmd(cmd)
+
+
+    for cmd in args:
+        print "%s%s" % (shell.prompt, cmd)
+        shell.onecmd(cmd)
 
     shell.cmdloop()

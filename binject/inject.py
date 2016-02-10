@@ -50,6 +50,12 @@ class Injector(object):
             return False
 
         self.editMode = mode
+        
+        if self.editMode == "process":
+            if not userHasRoot():
+                self.error("Needs to be root!")
+                return False
+
         if target:
             self.target = target
         return True
@@ -77,12 +83,17 @@ class Injector(object):
         return self.editor is not None
 
     def closeEditor(self):
+        if not self.checkEditor(): return False
+
         self.editor.close()
         self.editor = None
         return True
 
     def writeBinary(self, path):
+        if not self.checkEditor(): return False
+
         self.editor.write(path)
+        return True
 
 
     #
