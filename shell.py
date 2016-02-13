@@ -1,9 +1,11 @@
 #!/usr/bin/python
+import os
 import sys
 import cmd
 import time
 from optparse import OptionParser
 
+from binject.utils import userHasRoot
 from binject.inject import AutoInjector
 
 class InjectShell(cmd.Cmd):
@@ -15,6 +17,14 @@ class InjectShell(cmd.Cmd):
         cmd.Cmd.__init__(self)
 
         self.injector = AutoInjector()
+
+        if userHasRoot():
+            self.stdout.write("Mode: process\n")
+            self.injector.setEditMode("process")
+        else:
+            self.stdout.write("Mode: binary\n")
+            self.injector.setEditMode("binary")
+
         self.doPrintResult = True
 
     def convert(self, arg, typ):
@@ -63,20 +73,27 @@ class InjectShell(cmd.Cmd):
     #
     # Source Code Hooks
     #
-    def do_setSourcePath(self, arg):
-        [path] = self.parseArgs(arg, ["str"])
-        
-        return self.injector.setSourcePath(path)
-
     def do_extractHooks(self, arg):
-        self.hooks = self.injector.extractHooks()
-        self.do_hooks("")
-        return True
+        "Usage: extractHooks path/to/src/"
+        [path] = self.parseArgs(arg, ["str"])
+
+        if path and os.path.exists(path):
+            if self.injector.objdump:
+                self.injector.setSourcePath(path)
+                self.hooks = self.injector.extractHooks()
+                self.do_hooks("")
+                return True
+            else:
+                self.stdout.write("Needs to analyze a binary first\n")
+                return False
+        else:
+            self.do_help("extractHooks")
+            return False
 
     def do_hooks(self, arg):
         for i, hook in enumerate(self.hooks):
             lineObj, typ, lineText = hook
-            self.stdout.write("%.2d: %s\n" % (i+1, lineText))
+            self.stdout.write("%.2d. %s:%d\t%s\n" % (i+1, lineObj["file"], lineObj["lineno"], lineText.strip()))
         return True
 
     def do_hook(self, arg):
@@ -89,12 +106,40 @@ class InjectShell(cmd.Cmd):
             print inst
 
         return True
+
+    def do_source(self, arg):
+        [fname, lineno] = self.parseArgs(arg, ["str", "int"])
+
+        if fname:
+            sources = self.injector.objdump.getSources()
+            filedata = None
+            for path in sources:
+                if fname == os.path.basename(path):
+                    filedata = sources[path]
+                    break
+
+            if lineno:
+                if lineno in filedata:
+                    for i, inst in enumerate(self.injector.objdump.getInstructionsOfLine(filedata[lineno])):
+                        print inst
+                else:
+                    self.stdout.write("No instructions.\n")
+                    return False
+            else:
+                items = filedata.iteritems()
+                items = sorted(items, key=lambda x: x[0])
+                for lineno, line in items:
+                    print "%s:%d" % (line["file"], line["lineno"])
+
+        return True
+
         
     #
     # Editor
     #
     def do_setEditMode(self, arg):
         [path] = self.parseArgs(arg, ["str"])
+        self.stdout.write("Mode: %s\n" % (path))
         return self.injector.setEditMode(path)
 
     def do_setTarget(self, arg):
@@ -216,6 +261,60 @@ class InjectShell(cmd.Cmd):
     def do_help(self, arg):
         cmd.Cmd.do_help(self, arg)
         return True
+
+    def cmdloop(self, intro=None):
+        """Repeatedly issue a prompt, accept input, parse an initial prefix
+        off the received input, and dispatch to action methods, passing them
+        the remainder of the line as argument.
+
+        """
+
+        self.preloop()
+        if self.use_rawinput and self.completekey:
+            try:
+                import readline
+                self.old_completer = readline.get_completer()
+                readline.set_completer(self.complete)
+                readline.parse_and_bind(self.completekey+": complete")
+            except ImportError:
+                pass
+        try:
+            if intro is not None:
+                self.intro = intro
+            if self.intro:
+                self.stdout.write(str(self.intro)+"\n")
+            stop = None
+            while not stop:
+                if self.cmdqueue:
+                    line = self.cmdqueue.pop(0)
+                else:
+                    if self.use_rawinput:
+                        try:
+                            line = raw_input(self.prompt)
+                        except EOFError:
+                            line = 'EOF'
+                    else:
+                        self.stdout.write(self.prompt)
+                        self.stdout.flush()
+                        line = self.stdin.readline()
+                        if not len(line):
+                            line = 'EOF'
+                        else:
+                            line = line.rstrip('\r\n')
+
+                cmds = [a.strip() for a in line.split("&")]
+                for cmd in cmds:
+                    line = self.precmd(cmd)
+                    stop = self.onecmd(cmd)
+                    stop = self.postcmd(stop, cmd)
+            self.postloop()
+        finally:
+            if self.use_rawinput and self.completekey:
+                try:
+                    import readline
+                    readline.set_completer(self.old_completer)
+                except ImportError:
+                    pass
 
 
 

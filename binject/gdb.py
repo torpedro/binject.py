@@ -38,6 +38,10 @@ class GDBWrapper(AbstractByteEditor):
         self._p.stdin.write(line)
         self._p.stdin.flush()
 
+    def _waitForPrompt(self):
+        while self._lines[-1].startswith("(gdb)") is False:
+            sleep(0.001)
+
     def open(self):
         p = Popen([self._gdb, "-p", str(self._pid)], stdin=PIPE, stdout=PIPE, stderr=STDOUT)
         self._p = p
@@ -46,9 +50,7 @@ class GDBWrapper(AbstractByteEditor):
         t.start()    
 
         self._isOpen = True
-        # wait for prompt
-        while self._lines[-1].startswith("(gdb)") is False:
-            sleep(0.05)
+        self._waitForPrompt()
 
     def quit(self):
         self.writeToStdin("quit\n")
@@ -58,15 +60,15 @@ class GDBWrapper(AbstractByteEditor):
     def getByte(self, address):
         self.writeToStdin("x/ubfx %s" % (address))
         # self.writeToStdin("p *(char*)%s" % (address))
-        sleep(0.05)
+
+        self._waitForPrompt()
         res = self._lines[-2]
-        # print "[Result] ", res
-        # TODO handle
+        print "[Result] ", res
+        # TODO return
 
     def setByteInt(self, address, intvalue):
         self.writeToStdin("set (*(char*)%s) = %d" % (address, intvalue))
-
-        sleep(0.05)
+        self._waitForPrompt()
         res = self._lines[-2]
         # print res
 

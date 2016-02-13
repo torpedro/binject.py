@@ -1,5 +1,6 @@
 
 import re
+import os
 from subprocess import Popen, PIPE
 from asm import Section, Symbol, Instruction
 
@@ -30,14 +31,18 @@ class Objdump(object):
     def analyze(self, path, cacheFile=None):
         "Run objdump and analyze the stdout"
 
-        proc = Popen([self._command, self._flags, path], stdout=PIPE, stderr=PIPE)
-        proc.wait()
-        self._stdout = proc.stdout.read()
+        if os.path.exists(path):
+            proc = Popen([self._command, self._flags, path], stdout=PIPE, stderr=PIPE)
+            proc.wait()
+            self._stdout = proc.stdout.read()
 
-        if cacheFile:
-            self.cacheStdout(cacheFile)
+            if cacheFile:
+                self.cacheStdout(cacheFile)
 
-        self._parseResult(self._stdout)
+            self._parseResult(self._stdout)
+            return True
+        else:
+            return False
 
     def cacheStdout(self, cacheFile):
         with open(cacheFile, "w") as fh:
@@ -138,6 +143,8 @@ class Objdump(object):
                 instructions.append(self._instructions[addr])
         return instructions
 
+    def getInstructionsOfLine(self, line):
+        return self.getInstructionsOfRange(line["instruction_first"], line["instruction_last"])
 
     def getSection(self, id):
         return self._sections[id]

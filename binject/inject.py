@@ -28,8 +28,7 @@ class Injector(object):
         self.info("Analyzing the binary... (%s)" % (binaryPath))
 
         self.objdump = Objdump(objdumpBin)
-        self.objdump.analyze(binaryPath)
-        return True
+        return self.objdump.analyze(binaryPath)
 
     def loadAnalysis(self, pathToDump):
         self.objdump = Objdump()
